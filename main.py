@@ -6,16 +6,25 @@ import sys
 import mutagen
 
 ARTIST_KEY = 'TPE1'
+ALBUM_ARTIST_KEY = 'TPE2'
 ALBUM_KEY = 'TALB'
 TITLE_KEY = 'TIT2'
 TRACK_NUM_KEY = 'TRCK'
-YEAR_KEY = 'TDRC'
-METADATA_KEYS = [ARTIST_KEY, ALBUM_KEY, TITLE_KEY, TRACK_NUM_KEY, YEAR_KEY]
+TRACK_CNT_KEY = 'TXXX'
+YEAR_KEY = 'TYER'
+METADATA_KEYS = [ARTIST_KEY, ALBUM_ARTIST_KEY, ALBUM_KEY, TITLE_KEY, TRACK_NUM_KEY, TRACK_CNT_KEY,YEAR_KEY]
+
+cache = {
+    ARTIST_KEY: set([]),
+    ALBUM_ARTIST_KEY: set([]),
+    ALBUM_KEY: set([]),
+    TITLE_KEY: set([]),
+    TRACK_NUM_KEY: set([]),
+    TRACK_CNT_KEY: set([]),
+    YEAR_KEY: set([])
+}
 
 validExtensions = ['mp3']
-artistList = []
-albumList = []
-yearList = []
 
 
 def checkFiles(filelist):
@@ -33,14 +42,13 @@ def readFile(f):
             f = mutagen.File(fle)
     except mutagen.MutagenError as e:
         print("File unacceptable", e)
+        return
+
+    print(f)
 
     for k in METADATA_KEYS:
-        if k == ARTIST_KEY:
-            artistList.append(f[ARTIST_KEY])
-        elif k == ALBUM_KEY:
-            albumList.append(f[ALBUM_KEY])
-        elif k == YEAR_KEY:
-            yearList.append(f[YEAR_KEY])
+        if k in f:
+            cache[k].add(f[k].text[0])
 
 
 if __name__ == "__main__":
@@ -50,7 +58,6 @@ if __name__ == "__main__":
     if not checkFiles(files):
         print("Error checking files")
         sys.exit()
-    
+
     for f in files:
         readFile(f)
-            
