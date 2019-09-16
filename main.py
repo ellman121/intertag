@@ -12,9 +12,18 @@ TITLE_KEY = 'TIT2'
 TRACK_NUM_KEY = 'TRCK'
 TRACK_CNT_KEY = 'TXXX'
 YEAR_KEY = 'TYER'
-METADATA_KEYS = [ARTIST_KEY, ALBUM_ARTIST_KEY, ALBUM_KEY, TITLE_KEY, TRACK_NUM_KEY, TRACK_CNT_KEY,YEAR_KEY]
+METADATA_KEYS = [
+    ARTIST_KEY,
+    ALBUM_ARTIST_KEY,
+    ALBUM_KEY,
+    TITLE_KEY,
+    TRACK_NUM_KEY,
+    TRACK_CNT_KEY,
+    YEAR_KEY
+]
 
-# Yeah, it's a global.  Sue me, it's a 100 line python script to help manage metadata for mp3 tiles
+# Yeah, it's a global.  Sue me, it's a 100 line python script to help manage
+# metadata for mp3 songs
 cache = {
     ARTIST_KEY: set([]),
     ALBUM_ARTIST_KEY: set([]),
@@ -25,7 +34,23 @@ cache = {
     YEAR_KEY: set([])
 }
 
+field_names = {
+    ARTIST_KEY:       "Artist Name",
+    ALBUM_ARTIST_KEY: "Album Artist",
+    ALBUM_KEY:        "Album Title",
+    TITLE_KEY:        "Song Title",
+    TRACK_NUM_KEY:    "Track Number",
+    TRACK_CNT_KEY:    "Track Count",
+    YEAR_KEY:         "Year"
+}
+
 validExtensions = ['mp3']
+
+
+def resetCursor():
+    """Clear the page and set the cursor to the top left"""
+    print(u"\u001b[2J")
+    print(u"\u001b[0;0H")
 
 
 def checkFiles(filelist):
@@ -44,7 +69,6 @@ def checkFiles(filelist):
 def valueForKey(key, mutagenFile):
     if key in mutagenFile:
         return mutagenFile[key].text[0]
-    
     return ''
 
 
@@ -64,10 +88,26 @@ def printFileInfo(filename, mutagenFile):
     print("Track Title   : " + valueForKey(TITLE_KEY, mutagenFile))
     print("Track Number  : " + valueForKey(TRACK_NUM_KEY, mutagenFile))
     print("Total Tracks  : " + valueForKey(TRACK_CNT_KEY, mutagenFile))
+    print("")  # Skkp a line
 
 
 def completeMetadata(filename, mutagenFile):
-    printFileInfo(filename, mutagenFile)
+    # Fill metadata for each key
+    for k in METADATA_KEYS:
+        # Reset the cursor and print info that we've filled
+        resetCursor()
+        printFileInfo(filename, mutagenFile)
+
+        # Print our cache for this key
+        print("(0) - Skip")
+        for i, v in enumerate(cache[k]):
+            print("(%d) - %s" % (i + 1, v))
+        
+        print("")
+        input("%13s :" % (field_names[k]))
+        # TODO: Set the metadata we read in
+    
+    return
 
 
 if __name__ == "__main__":
