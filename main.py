@@ -1,7 +1,6 @@
 # Intertag
 # Interactive metadata enditor for audio files
 
-import pprint
 import sys
 import mutagen
 
@@ -10,28 +9,22 @@ ALBUM_ARTIST_KEY = 'TPE2'
 ALBUM_KEY = 'TALB'
 TITLE_KEY = 'TIT2'
 TRACK_NUM_KEY = 'TRCK'
-TRACK_CNT_KEY = 'TXXX'
-YEAR_KEY = 'TYER'
 METADATA_KEYS = [
     ARTIST_KEY,
     ALBUM_ARTIST_KEY,
     ALBUM_KEY,
     TITLE_KEY,
     TRACK_NUM_KEY,
-    TRACK_CNT_KEY,
-    YEAR_KEY
 ]
 
 # Yeah, it's a global.  Sue me, it's a 100 line python script to help manage
 # metadata for mp3 songs
 cache = {
-    ARTIST_KEY: set([]),
-    ALBUM_ARTIST_KEY: set([]),
-    ALBUM_KEY: set([]),
-    TITLE_KEY: set([]),
-    TRACK_NUM_KEY: set([]),
-    TRACK_CNT_KEY: set([]),
-    YEAR_KEY: set([])
+    ARTIST_KEY: [],
+    ALBUM_ARTIST_KEY: [],
+    ALBUM_KEY: [],
+    TITLE_KEY: [],
+    TRACK_NUM_KEY: [],
 }
 
 field_names = {
@@ -40,8 +33,6 @@ field_names = {
     ALBUM_KEY:        "Album Title",
     TITLE_KEY:        "Song Title",
     TRACK_NUM_KEY:    "Track Number",
-    TRACK_CNT_KEY:    "Track Count",
-    YEAR_KEY:         "Year"
 }
 
 validExtensions = ['mp3']
@@ -74,21 +65,35 @@ def valueForKey(key, mutagenFile):
 
 def addExistingMetadataToCache(f):
     for k in METADATA_KEYS:
-        if k in f:
-            cache[k].add(valueForKey(k, f))
+        if k in f and valueForKey(k, f) not in cache[k]:
+            cache[k].append(valueForKey(k, f))
 
 
 def printFileInfo(filename, mutagenFile):
     # Print the file info to the terminal
-    print("** FILE: " + filename + "\n")
+    print("** FILE: " + filename)
+    print("")  # Skip a line
     print("Artist Name   : " + valueForKey(ARTIST_KEY, mutagenFile))
     print("Album Artist  : " + valueForKey(ALBUM_ARTIST_KEY, mutagenFile))
     print("Album Name    : " + valueForKey(ALBUM_KEY, mutagenFile))
-    print("Year Released : " + valueForKey(YEAR_KEY, mutagenFile))
     print("Track Title   : " + valueForKey(TITLE_KEY, mutagenFile))
     print("Track Number  : " + valueForKey(TRACK_NUM_KEY, mutagenFile))
-    print("Total Tracks  : " + valueForKey(TRACK_CNT_KEY, mutagenFile))
     print("")  # Skkp a line
+
+
+def generateTagFrameForKey(k, v):
+    if k == ARTIST_KEY:
+        return mutagen.id3.TPE1(encoding=3, text=v)
+    elif k == ALBUM_ARTIST_KEY:
+        return mutagen.id3.TPE2(encoding=3, text=v)
+    elif k == ALBUM_KEY:
+        return mutagen.id3.TALB(encoding=3, text=v)
+    elif k == TITLE_KEY:
+        return mutagen.id3.TIT2(encoding=3, text=v)
+    elif k == TRACK_NUM_KEY:
+        return mutagen.id3.TRCK(encoding=3, text=v)
+    else:
+        raise KeyError(k)
 
 
 def completeMetadata(filename, mutagenFile):
@@ -99,14 +104,30 @@ def completeMetadata(filename, mutagenFile):
         printFileInfo(filename, mutagenFile)
 
         # Print our cache for this key
-        print("(0) - Skip")
+        print("(i) - Type new value")
+        print("(s) - Skip field")
+        print("(n) - Next song")
         for i, v in enumerate(cache[k]):
-            print("(%d) - %s" % (i + 1, v))
-        
+            print("(%d) - %s" % (i, v))
+
         print("")
-        input("%13s :" % (field_names[k]))
-        # TODO: Set the metadata we read in
-    
+        i = input("%13s : " % (field_names[k]))
+
+        if i == "s":
+            continue
+
+        if i == "n":
+            return
+
+        if i == "i":
+            i = input("    New Value : ")
+            cache[k].append(i)
+        else:
+            i = cache[k][int(i)]
+
+        mutagenFile[k] = generateTagFrameForKey(k, i)
+        mutagenFile.save(filename)
+
     return
 
 
