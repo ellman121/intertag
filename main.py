@@ -11,7 +11,6 @@ TITLE_KEY = 'TIT2'
 TRACK_NUM_KEY = 'TRCK'
 METADATA_KEYS = [
     ARTIST_KEY,
-    ALBUM_ARTIST_KEY,
     ALBUM_KEY,
     TITLE_KEY,
     TRACK_NUM_KEY,
@@ -21,8 +20,8 @@ METADATA_KEYS = [
 # help manage metadata for mp3 songs, I think I can bear to deal with a handful
 # of global maps
 cache = {
-    ARTIST_KEY: [],
-    ALBUM_KEY: {},  # Indexed by artist name
+    ARTIST_KEY: [],  # Set of artist names (as strings)
+    ALBUM_KEY: [],   # Set of (artist, album) tuples
 }
 
 field_names = {
@@ -63,8 +62,22 @@ def valueForKeyInMutagenFile(key, mutagenFile):
 
 def addExistingMetadataToCache(f):
     for k in METADATA_KEYS:
-        if k in f and valueForKeyInMutagenFile(k, f) not in cache[k]:
-            cache[k].append(valueForKeyInMutagenFile(k, f))
+        if k == ARTIST_KEY and k in f:
+            s = set(cache[k])
+            s.add(valueForKeyInMutagenFile(k, f))
+            cache[k] = list(s)
+        elif k == ALBUM_KEY and k in f:
+            pair = (
+                valueForKeyInMutagenFile(ARTIST_KEY, f),
+                valueForKeyInMutagenFile(ALBUM_KEY, f)
+            )
+
+            s = set(cache[k])
+            s.add(pair)
+            cache[k] = list(s)
+
+    cache[ARTIST_KEY].sort()
+    cache[ALBUM_KEY].sort()
 
 
 def printFileInfo(fname, f):
@@ -94,63 +107,78 @@ def generateTagFrameForKey(k, v):
         raise KeyError(k)
 
 
-def completeArtist(filename, mutagenFile):
-    """
-    Fill and save the artist information, return true if the user wants to
-    skip to the next song
-    """
+def cachedAlbumsForArtist(artistName):
+    return list(filter(lambda t: t[0] == artistName, cache[ALBUM_KEY]))
 
-    # Print our cache for this key
-    print("(i) - Type new value")
-    print("(s) - Skip field")
-    print("(n) - Next song")
-    for i, v in enumerate(cache[ARTIST_KEY]):
-        print("(%d) - %s" % (i, v))
+
+def printCacheForKey(k, artistName):
+    if k == ARTIST_KEY or k == ALBUM_ARTIST_KEY:
+        for i, v in enumerate(cache[ARTIST_KEY]):
+            print("(%d) - %s" % (i, v))
+    elif k == ALBUM_KEY:
+        if len(cache[ALBUM_KEY]) > 0:
+            for i, v in enumerate(cachedAlbumsForArtist(artistName)):
+                print("(%d) - %s" % (i, v[1]))
 
     print("")
-    i = input("%13s : " % (field_names[ARTIST_KEY]))
-
-    if i == "s" or i == "n":
-        return i == "n"
-
-    if i == "i":
-        i = input("    New Value : ")
-        if i not in cache[ARTIST_KEY]:
-            cache[ARTIST_KEY].append(i)
-        else:
-            i = cache[ARTIST_KEY][cache[ARTIST_KEY].index(i)]
-    else:
-        i = cache[ARTIST_KEY][int(i)]
-
-    mutagenFile[ARTIST_KEY] = generateTagFrameForKey(ARTIST_KEY, i)
-    mutagenFile[ALBUM_ARTIST_KEY] = generateTagFrameForKey(ALBUM_ARTIST_KEY, i)
-    mutagenFile.save(filename)
-    return False
 
 
 def completeMetadata(filename, mutagenFile):
     # Fill metadata for each key
     for k in METADATA_KEYS:
+        # Get the current artist because we need it to filter our cache prompt
+        currentArtist = valueForKeyInMutagenFile(ARTIST_KEY, mutagenFile)
+
         # Reset the cursor and print info that we've filled
         resetCursor()
         printFileInfo(filename, mutagenFile)
 
-        v = False
-        if k == ARTIST_KEY:
-            v = completeArtist(filename, mutagenFile)
-        elif k == ALBUM_ARTIST_KEY:
-            continue  # Skip because we do both artist + album artist above
-        elif k == ALBUM_KEY:
-            # Complete Album
-            continue
-        elif k == TITLE_KEY:
-            # Complete title
-            continue
-        elif k == TRACK_NUM_KEY:
-            # Complete title
+        # Print our prompt
+        print("(s) - Skip field")
+        print("(n) - Next song")
+
+        if k == ARTIST_KEY or k == ALBUM_KEY:
+            print("(i) - Type new value")
+            printCacheForKey(k, currentArtist)
+
+        i = input("%13s : " % (field_names[k]))
+
+        if i == "s":
             continue
 
-    return
+        if i == "n":
+            return
+
+        if k == TRACK_NUM_KEY or k == TITLE_KEY:
+            mutagenFile[k] = generateTagFrameForKey(k, i)
+            mutagenFile.save(filename)
+            continue
+
+        # If the user wants to input a new value
+        if i == "i":
+            i = input("    New Value : ")
+            v = i
+            if k == ALBUM_KEY:
+                v = (currentArtist, i)
+
+            s = set(cache[k])
+            s.add(v)
+            cache[k] = list(s)
+            cache[k].sort()
+
+        # If the user selected an option
+        else:
+            if k == ARTIST_KEY:
+                i = cache[k][int(i)]
+            elif k == ALBUM_KEY:
+                i = cachedAlbumsForArtist(currentArtist)[int(i)][1]
+
+        if k == ARTIST_KEY:
+            mutagenFile[ALBUM_ARTIST_KEY] = generateTagFrameForKey(
+                                                ALBUM_ARTIST_KEY, i)
+
+        mutagenFile[k] = generateTagFrameForKey(k, i)
+        mutagenFile.save(filename)
 
 
 if __name__ == "__main__":
